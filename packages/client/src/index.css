@@ -1,0 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
+:root {
+  /* 严谨商务与学术体系色阶 (Rigorous Business & Academic) */
+  --bg-main: #0f1115;
+  --bg-card: #181a1f;
+  --bg-card-hover: #22252b;
+
+  /* PLS 四维专属色相 - 修正为更有质感的色系 */
+  --color-p: #d4af37;
+  /* Power: 哑光金/权力 */
+  --color-l: #2563eb;
+  /* Logic: 深度理性蓝 */
+  --color-s: #10b981;
+  /* Stability: 稳健翠绿 */
+  --color-e: #e11d48;
+  /* Empathy: 情感玫瑰红 */
+
+  --text-primary: #e5e7eb;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+
+  --border-color: #2d3139;
+  --glow-primary: rgba(212, 175, 55, 0.1);
+
+  --font-serif: 'Noto Serif SC', 'Georgia', 'Times New Roman', serif;
+  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  padding: 2rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(180deg, rgba(19, 24, 41, 0.8) 0%, rgba(10, 14, 26, 0) 100%);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  color: var(--text-primary);
+  font-family: var(--font-serif);
+  letter-spacing: 2px;
+}
+
+.app-header p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.welcome-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 3rem;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.welcome-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border-color: var(--text-muted);
+}
+
+.welcome-card h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.welcome-card p {
+  color: var(--color-s);
+  margin-bottom: 0;
+}

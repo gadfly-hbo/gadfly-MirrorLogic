@@ -1,0 +1,410 @@
+# 灵犀镜像 (MirrorLogic) v2.0 产品开发方案
+
+## 一、项目概述
+
+基于产品白皮书 v2.0，将灵犀镜像从概念定义推进到可落地的全栈 Web 应用。系统定位为"基于 PLS 引擎的 AI 沟通与博弈全真模拟器"，核心价值是让用户在面对高压沟通场景前，通过数字孪生体完成推演训练。
+
+> [!IMPORTANT]
+> **关键架构决策：** 本方案采用"前端单页应用 + Node.js 中间层 + LLM API 桥接"的三层架构。PLS 核心计算逻辑在 Node.js 层完成，大语言模型负责角色扮演与自然语言生成。这使得核心心理学模型不依赖 LLM 的概率性输出，保证了人格一致性。
+
+---
+
+## 二、系统架构设计
+
+### 2.1 总体架构图
+
+```mermaid
+graph TB
+    subgraph "前端层 (Vite + React)"
+        UI["UI 界面"]
+        Chat["对话沙盘"]
+        Dashboard["数据仪表盘"]
+        Probe["灵犀探针问卷"]
+    end
+
+    subgraph "中间层 (Node.js + Express)"
+        API["REST API 网关"]
+        PLS_Engine["PLS 人格逻辑引擎"]
+        Strategy["策略匹配引擎"]
+        Success["成功率计算器"]
+        Session["会话状态管理"]
+    end
+
+    subgraph "数据层"
+        SQLite["SQLite (本地优先)"]
+        LLM["LLM API (OpenAI/Gemini)"]
+        Benchmark["行业基准库 JSON"]
+    end
+
+    UI --> API
+    Chat --> API
+    Dashboard --> API
+    Probe --> API
+    API --> PLS_Engine
+    API --> Strategy
+    API --> Success
+    API --> Session
+    PLS_Engine --> SQLite
+    PLS_Engine --> LLM
+    Strategy --> LLM
+    Strategy --> Benchmark
+    Success --> PLS_Engine
+    Session --> SQLite
+```
+
+### 2.2 技术选型
+
+| 层级 | 技术 | 理由 |
+|------|------|------|
+| 前端 | **Vite + React 19** | 快速 HMR，组件化架构适合复杂交互界面 |
+| 样式 | **Vanilla CSS + CSS Variables** | 设计系统完全可控，支持深色主题 |
+| 中间层 | **Node.js + Express** | 轻量、异步 I/O 适合 LLM 流式响应 |
+| 数据库 | **SQLite (better-sqlite3)** | 本地优先隐私保护，零配置部署 |
+| LLM 桥接 | **OpenAI SDK (兼容 Gemini)** | 统一接口，可切换模型供应商 |
+| 实时通信 | **Server-Sent Events (SSE)** | LLM 流式响应推送到前端 |
+
+### 2.3 核心设计原则
+
+1. **隐私优先 (Privacy-First)：** 所有 PLS 数据存储在本地 SQLite，不上传云端
+2. **模型无关 (Model-Agnostic)：** LLM 调用通过适配器模式封装，可随时切换
+3. **确定性计算 (Deterministic Core)：** PLS 参数化计算不依赖 LLM，保证可复现
+4. **渐进式复杂度 (Progressive Complexity)：** 先实现核心流程闭环，再迭代高级功能
+
+---
+
+## 三、模块分解与数据模型
+
+### 3.1 项目目录结构
+
+```
+灵犀镜像MirrorLogic/
+├── package.json                 # Monorepo 根配置
+├── packages/
+│   ├── client/                  # 前端 React 应用
+│   │   ├── src/
+│   │   │   ├── components/      # 可复用组件
+│   │   │   │   ├── common/      # 通用 UI 组件
+│   │   │   │   ├── probe/       # 灵犀探针组件
+│   │   │   │   ├── sandbox/     # 沙盘对话组件
+│   │   │   │   ├── strategy/    # 策略工坊组件
+│   │   │   │   └── insights/    # 复盘看板组件
+│   │   │   ├── pages/           # 页面路由
+│   │   │   ├── stores/          # 状态管理 (Zustand)
+│   │   │   ├── hooks/           # 自定义 Hooks
+│   │   │   ├── styles/          # 全局样式与 CSS Variables
+│   │   │   ├── utils/           # 前端工具函数
+│   │   │   ├── App.jsx
+│   │   │   └── main.jsx
+│   │   ├── index.html
+│   │   └── vite.config.js
+│   │
+│   └── server/                  # 后端 Node.js 服务
+│       ├── src/
+│       │   ├── routes/          # API 路由
+│       │   ├── engines/         # 核心引擎
+│       │   │   ├── pls-engine.js        # PLS 人格逻辑引擎
+│       │   │   ├── strategy-engine.js   # 策略匹配引擎
+│       │   │   ├── success-calculator.js # 成功率计算器
+│       │   │   └── probe-engine.js      # 探针问卷引擎
+│       │   ├── llm/             # LLM 适配层
+│       │   │   ├── adapter.js           # 统一接口
+│       │   │   ├── openai-provider.js
+│       │   │   └── gemini-provider.js
+│       │   ├── models/          # 数据模型 (SQLite)
+│       │   ├── middleware/      # Express 中间件
+│       │   ├── data/            # 静态数据
+│       │   │   ├── benchmarks/  # 行业基准 PLS 库
+│       │   │   ├── frameworks/  # 沟通框架定义
+│       │   │   └── probes/      # 探针题库
+│       │   └── app.js           # Express 入口
+│       └── package.json
+│
+├── docs/                        # 项目文档
+└── .env.example                 # 环境变量模板
+```
+
+### 3.2 核心数据模型
+
+#### PLS 人格档案 (PersonaProfile)
+
+```javascript
+// 核心 PLS 数据结构
+const PersonaProfile = {
+  id: "uuid",
+  name: "张总",
+  relationship: "direct_boss",      // 关系类型
+  captureMethod: "probe | data",    // 冷启动/热启动
+  createdAt: "ISO-8601",
+  updatedAt: "ISO-8601",
+
+  // ===== PLS 四维参数 (0-100 标准化) =====
+  pls: {
+    P: 82,  // Power - 权力意志
+    L: 71,  // Logic - 逻辑权重
+    S: 65,  // Stability - 安全冗余
+    E: 38,  // Empathy - 共情开合
+    confidence: 0.72  // 参数置信度 (0-1)
+  },
+
+  // ===== 动态心理动能 =====
+  dynamics: {
+    coreFears: ["loss_of_control", "loss_of_face"],
+    cognitiveBiases: ["sunk_cost_fallacy", "loss_aversion"],
+    decisionStyle: "data_driven_with_authority",
+    stressTriggers: ["being_questioned_publicly", "lack_of_options"]
+  },
+
+  // ===== 环境上下文 (v2.0 新增) =====
+  contextWeights: {
+    thirdPartyPressure: 0.3,     // 第三方压力系数
+    organizationalPosition: "middle_management",
+    currentPressureSources: ["board_kpi", "team_attrition"],
+    decisionAutonomy: 0.6        // 决策自主度 (0-1)
+  },
+
+  // ===== 进化日志 =====
+  evolutionLog: [
+    { date: "ISO-8601", event: "negotiation_salary", outcome: "partial_success", adjustments: { P: +3, S: -2 } }
+  ]
+};
+```
+
+#### 沙盘会话 (SandboxSession)
+
+```javascript
+const SandboxSession = {
+  id: "uuid",
+  personaId: "uuid",           // 关联的 PLS 档案
+  scenario: "salary_negotiation",
+  mode: "standard | devil_advocate",
+  strategyFramework: "fbi_negotiation",
+
+  // 对话历史
+  messages: [
+    {
+      id: "uuid",
+      role: "user | twin",
+      content: "原始内容",
+      timestamp: "ISO-8601",
+      metrics: {
+        successDelta: +0.08,      // 该条消息对成功率的影响
+        emotionFriction: 0.15,    // 情绪摩擦系数
+        resistanceChange: -0.05,  // 阻力变化
+        triggers: ["territory_defense"]  // 触发的防御机制
+      }
+    }
+  ],
+
+  // 实时指标
+  liveMetrics: {
+    currentSuccessRate: 0.62,
+    emotionalResistance: 0.35,
+    trustLevel: 0.48,
+    turnsCount: 12
+  }
+};
+```
+
+### 3.3 核心 API 设计
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/personas` | GET/POST | 人格档案 CRUD |
+| `/api/personas/:id` | GET/PUT/DELETE | 单档案操作 |
+| `/api/personas/:id/pls` | GET/PUT | 读取/更新 PLS 参数 |
+| `/api/probe/start` | POST | 启动冷启动探针问卷 |
+| `/api/probe/answer` | POST | 提交探针答案 (动态分支) |
+| `/api/probe/result` | GET | 获取探针分析结果 → PLS |
+| `/api/capture/upload` | POST | 热启动：上传聊天数据 |
+| `/api/capture/analyze` | POST | 分析上传数据 → PLS |
+| `/api/strategy/generate` | POST | 基于 PLS 生成沟通策略 |
+| `/api/strategy/transform` | POST | 话术转化引擎 |
+| `/api/sandbox/create` | POST | 创建沙盘会话 |
+| `/api/sandbox/:id/chat` | POST (SSE) | 沙盘对话 (流式) |
+| `/api/sandbox/:id/metrics` | GET | 实时指标 |
+| `/api/insights/:sessionId` | GET | 复盘分析报告 |
+| `/api/benchmarks` | GET | 行业基准 PLS 库 |
+
+---
+
+## 四、核心引擎详细设计
+
+### 4.1 PLS 引擎 (pls-engine.js)
+
+PLS 引擎是整个系统的心脏。它接收原始数据（探针答案或聊天数据），输出标准化的 PLS 四维参数。
+
+**探针路径的计算逻辑：**
+- 每道题目携带权重向量 `[wP, wL, wS, wE]`
+- 用户选择的选项对应分值向量 `[vP, vL, vS, vE]`
+- 最终 PLS = Σ(权重 × 分值) / 总权重 × 100，归一化到 0-100
+
+**热启动路径的计算逻辑：**
+- 调用 LLM 分析聊天文本，提取行为指纹
+- 将 LLM 的结构化输出（JSON）解析为 PLS 初始值
+- 通过行为指纹交叉校验修正置信度
+
+### 4.2 策略匹配引擎 (strategy-engine.js)
+
+内置沟通框架映射矩阵：
+
+```
+PLS 区间 → 框架匹配：
+  P≥70 & L≥70 → FBI谈判术 + 金字塔原理
+  P≥70 & L<50 → 权威引导 + 权力让渡术
+  E≥70 & L<50 → 非暴力沟通(NVC) + 共情回路
+  S≥70         → 风险对冲框架 + Plan B 话术加持
+  通用兜底     → STAR 情景对话框架
+```
+
+### 4.3 成功率计算器 (success-calculator.js)
+
+实现白皮书中的多变量公式：
+
+```
+P_success = Σ(Script_Weight × PLS_Parameter) + Trust_increment
+            ─────────────────────────────────────────────────────
+            ω × Resistance_initial + δ × Emotion_friction + Context_noise
+```
+
+每轮对话后 LLM 评估用户话术并输出结构化指标，计算器基于此实时更新成功率。
+
+### 4.4 环境变量权重系统 (v2.0 新增)
+
+回应白皮书中"第三方博弈者"的问题——本方案引入"环境上下文层"：
+
+- **第三方压力系数** (`thirdPartyPressure`)：影响对象的 S 参数波动
+- **决策自主度** (`decisionAutonomy`)：修正成功率上限（自主度低 = 即使说服也未必能拍板）
+- **当前压力源** (`currentPressureSources`)：动态调整对象的防御阈值
+
+这使模型从"孤立反应容器"进化为"受环境约束的决策节点"。
+
+---
+
+## 五、前端 UI/UX 设计规划
+
+### 5.1 设计语言
+
+- **主题：** 深色为主 + 霓虹重点色，传达"数字孪生""高科技沙盘"的视觉隐喻
+- **色彩体系：** 主背景 `#0a0e1a`，卡片 `#131829`，PLS 四维各有专属色相
+  - P (Power) → 紫色 `hsl(270, 80%, 60%)`
+  - L (Logic) → 蓝色 `hsl(210, 80%, 60%)`
+  - S (Stability) → 青色 `hsl(170, 80%, 60%)`
+  - E (Empathy) → 粉橙 `hsl(15, 85%, 65%)`
+- **字体：** Inter (西文) + 思源黑体 (中文)
+- **动效：** PLS 雷达图呼吸动画、成功率实时脉动、消息气泡滑入
+
+### 5.2 核心页面
+
+```mermaid
+graph LR
+    Home["首页/仪表盘"] --> Create["创建镜像"]
+    Create -->|冷启动| Probe["灵犀探针"]
+    Create -->|热启动| Capture["数据捕获"]
+    Probe --> Profile["PLS 人格面板"]
+    Capture --> Profile
+    Profile --> Strategy["策略工坊"]
+    Strategy --> Sandbox["博弈沙盘"]
+    Sandbox --> Insights["复盘看板"]
+    Home --> Library["镜像库"]
+    Library --> Profile
+```
+
+**页面功能概述：**
+
+| 页面 | 核心交互 | 关键组件 |
+|------|----------|----------|
+| **首页仪表盘** | 镜像总览、最近会话、快速入口 | 统计卡片、活动流 |
+| **灵犀探针** | 8-12 道动态分支题 | 带进度条的卡片式问卷、过渡动画 |
+| **数据捕获** | 上传文件、粘贴文本 | 拖拽上传区、分析进度 |
+| **PLS 人格面板** | PLS 四维雷达图、动态特征清单 | 交互式雷达图、参数滑块 |
+| **策略工坊** | A/B/C 脚本对比、话术转化 | 三栏对比卡、输入→转化实时预览 |
+| **博弈沙盘** | 实时对话 + 侧边指标仪表 | 对话气泡、情绪阻力仪表盘、模式切换 |
+| **复盘看板** | 致命伤高亮、利益对齐图 | 时间线回放、热力高亮、双赢备忘录 |
+
+---
+
+## 六、开发路线图 (Phased Roadmap)
+
+### Phase 1：核心闭环 MVP (优先实现)
+
+**目标：** 完成"冷启动探针 → PLS 生成 → 单轮沙盘对话"的最小可行路径。
+
+| 优先级 | 任务 | 预估规模 |
+|--------|------|----------|
+| P0 | 项目骨架搭建 (Monorepo + Vite + Express) | 小 |
+| P0 | PLS 数据模型 + SQLite 存储层 | 小 |
+| P0 | 探针题库设计 (8 道核心题) + 探针引擎 | 中 |
+| P0 | PLS 引擎 (探针 → PLS 映射算法) | 中 |
+| P0 | LLM 适配层 (OpenAI/Gemini) | 小 |
+| P0 | 沙盘对话核心 (PLS 注入 Prompt + SSE 流式) | 大 |
+| P0 | 前端：探针问卷页 | 中 |
+| P0 | 前端：PLS 人格面板 (雷达图) | 中 |
+| P0 | 前端：沙盘对话页 | 大 |
+
+### Phase 2：策略系统与指标
+
+| 优先级 | 任务 |
+|--------|------|
+| P1 | 策略匹配引擎 + 沟通框架库 |
+| P1 | 话术转化引擎 (大白话 → PLS 优化话术) |
+| P1 | 成功率计算器 + 实时指标面板 |
+| P1 | 情绪阻力值可视化 |
+| P1 | 前端：策略工坊页 |
+
+### Phase 3：进阶功能
+
+| 优先级 | 任务 |
+|--------|------|
+| P2 | 热启动数据捕获 (文本分析 → PLS) |
+| P2 | "杠精模式" (恶魔代言人) |
+| P2 | 复盘看板 + 致命伤分析 |
+| P2 | 行业基准 PLS 库 |
+| P2 | PLS 进化引擎 (实战反馈 → 参数微调) |
+| P2 | 环境变量系统 (第三方博弈者权重) |
+
+---
+
+## 七、验证计划
+
+### 自动化测试
+
+```bash
+# 1. 后端单元测试 (引擎计算逻辑)
+cd packages/server && npm test
+
+# 2. PLS 计算正确性验证
+# 使用预设的探针答案组合，验证输出 PLS 是否在预期范围内
+node tests/pls-engine.test.js
+
+# 3. 前端组件渲染测试
+cd packages/client && npm test
+```
+
+### 浏览器端到端验证
+
+在 `npm run dev` 启动前后端后，通过浏览器子代理执行以下流程验证：
+
+1. **探针流程验证：** 访问首页 → 创建新镜像 → 完成探针问卷 → 验证 PLS 雷达图正确显示
+2. **沙盘对话验证：** 进入沙盘 → 发送测试消息 → 验证 AI 回复符合 PLS 人格设定 → 验证指标面板更新
+3. **UI 视觉验证：** 截图确认深色主题、动画效果、响应式布局
+
+### 人工验证
+
+> [!IMPORTANT]
+> 以下验证需要用户手动确认：
+> 1. 探针题目的心理学有效性（题目是否真正能区分人格维度）
+> 2. PLS 参数对 LLM 角色扮演的影响是否"感觉像那个人"
+> 3. 话术转化的实际质量评估
+
+---
+
+## User Review Required
+
+> [!WARNING]
+> **LLM API Key 配置：** 本方案需要 OpenAI 或 Gemini 的 API Key。请确认您偏好使用哪个 LLM 供应商，以及 API Key 的获取方式。
+
+> [!IMPORTANT]
+> **关于"环境变量"回答：** 针对白皮书中提出的"第三方博弈者"问题，本方案在 PLS 数据模型中新增了 `contextWeights` 层级，将目标对象从"孤立容器"提升为"受环境约束的决策节点"。此设计安排在 Phase 3 实现，优先保证核心闭环的交付。请确认此优先级排序是否合理。
+
+> [!NOTE]
+> **Monorepo 选择：** 本方案使用 npm workspaces 管理前后端。如果您偏好其他项目组织方式（如单目录简化版），请告知。
