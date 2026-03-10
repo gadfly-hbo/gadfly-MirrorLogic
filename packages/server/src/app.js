@@ -12,6 +12,17 @@ import benchmarksRouter from './routes/benchmarks.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// 捕获未处理的 Promise 拒绝
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// 捕获未捕获的异常
+process.on('uncaughtException', (err) => {
+    console.error('[CRITICAL] Uncaught Exception thrown:', err);
+    process.exit(1);
+});
+
 const allowedOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
     : ['http://localhost:3000', 'http://localhost:5173'];
