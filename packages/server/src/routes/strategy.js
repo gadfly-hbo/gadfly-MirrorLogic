@@ -40,23 +40,26 @@ ${rawInput}
 
 【场景辅助信息】：${scenario || '日常交锋/谈判'}
 
-【你的任务】：
-请立刻将这句大白话说教成且只能输出 3 种完全不同风格战术的话术（不要解释框架，直接输出干货），要求严格格式化为 JSON 输出：
+必须依据上述背景和原话，**仅输出一个**符合以下结构的 JSON 对象。禁止包含任何 Markdown 格式、引导语或解释。
+
+JSON 结构：
 {
-  "custom_framework": "针对此场景的具体策略思路（基于对方的PLS特征分析为什么原话不可行，以及正确的沟通框架逻辑）",
-  "key_flaws": ["这句话的第一个致命伤: 没有数据支撑", "这句话的第二个致命伤: 语气过于挑战权威"],
-  "A": { "style": "激进压制型/结论先行 (主攻高P/高L痛点)", "script": "这里是话术内容..." },
-  "B": { "style": "温和引导型/防守垫层 (安抚其高S防线，建立共商机制)", "script": "..." },
-  "C": { "style": "利益互换型/以进为退 (给出无法轻易拒绝的 ROI 代价)", "script": "..." }
+  "custom_framework": "策略思路解析",
+  "key_flaws": ["雷点1", "雷点2"],
+  "A": { "style": "风格名", "script": "话术内容" },
+  "B": { "style": "风格名", "script": "话术内容" },
+  "C": { "style": "风格名", "script": "话术内容" }
 }
-务必仅返回这一个 JSON 对象，禁止输出任何反引号、Markdown 代码块标签以及前后的解释性文字。输出内容必须可以直接被 JSON.parse() 处理。
 `;
 
         const messages = [{ role: 'user', content: prompt }];
-        const completion = await llmProvider.generateChatResponse(messages, false);
+        // 尝试开启 JSON Mode (DeepSeek/OpenAI 支持)
+        const completion = await llmProvider.generateChatResponse(messages, false, {
+            response_format: { type: "json_object" }
+        });
         let textOutput = completion.choices[0].message.content.trim();
 
-        // --- 健壮的 JSON 提取与清洗函数 ---
+        console.log(`[DEBUG] LLM Transform Raw Output Length: ${textOutput.length}`);
         const parseRobustJson = (text) => {
             let jsonStr = text;
             try {

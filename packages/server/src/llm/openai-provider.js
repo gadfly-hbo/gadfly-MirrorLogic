@@ -21,7 +21,7 @@ const openai = apiKey ? new OpenAI({
     baseURL: baseURL,
 }) : null;
 
-export async function generateChatResponse(messages, stream = false) {
+export async function generateChatResponse(messages, stream = false, options = {}) {
     if (!openai) {
         throw new Error('LLM Provider 未初始化，请检查 DEEPSEEK_API_KEY 环境变量');
     }
@@ -31,7 +31,8 @@ export async function generateChatResponse(messages, stream = false) {
             messages: messages,
             stream: stream,
             temperature: 0.7,
-            max_tokens: 1024,
+            max_tokens: 2048, // 增加上限，防止复杂 JSON 截断
+            ...options
         });
 
         return completion;
