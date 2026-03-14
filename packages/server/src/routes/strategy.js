@@ -49,21 +49,47 @@ ${rawInput}
   "B": { "style": "温和引导型/防守垫层 (安抚其高S防线，建立共商机制)", "script": "..." },
   "C": { "style": "利益互换型/以进为退 (给出无法轻易拒绝的 ROI 代价)", "script": "..." }
 }
-务必仅返回这一个JSON对象，不要加上反引号或额外的标记，便于后端直接解析。
+务必仅返回这一个 JSON 对象，禁止输出任何反引号、Markdown 代码块标签以及前后的解释性文字。输出内容必须可以直接被 JSON.parse() 处理。
 `;
 
         const messages = [{ role: 'user', content: prompt }];
         const completion = await llmProvider.generateChatResponse(messages, false);
         let textOutput = completion.choices[0].message.content.trim();
 
-        // 增强的 JSON 提取逻辑：匹配最外层的 { ... } 结构
-        const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            textOutput = jsonMatch[0];
-        }
+        // --- 健壮的 JSON 提取与清洗函数 ---
+        const parseRobustJson = (text) => {
+            let jsonStr = text;
+            try {
+                // 1. 尝试直接解析
+                return JSON.parse(text);
+            } catch (e) {
+                // 2. 尝试提取最外层 { }
+                const match = text.match(/\{[\s\S]*\}/);
+                if (!match) throw new Error("无法在输出中找到 JSON 结构");
+                
+                jsonStr = match[0];
+                
+                // 3. 清理常见的 LLM JSON 格式错误
+                jsonStr = jsonStr
+                    .replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*/g, '$1') // 移除注释，但避开 URL 中的 //
+                    .replace(/,\s*([\}\]])/g, '$1') // 去除对象/数组末尾的冗余逗号
+                    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // 移除非法控制字符
+                
+                try {
+                    return JSON.parse(jsonStr);
+                } catch (e2) {
+                    // 4. 极端情况：处理内部未转义的换行
+                    // 注意：这只是一个脆弱的尝试，仅针对字符串值内部的硬回车
+                    const fixedJson = jsonStr.replace(/"([^"]*)"/g, (m, p1) => {
+                        return '"' + p1.replace(/\n/g, "\\n").replace(/\r/g, "\\r") + '"';
+                    });
+                    return JSON.parse(fixedJson);
+                }
+            }
+        };
 
         try {
-            const resultObj = JSON.parse(textOutput);
+            const resultObj = parseRobustJson(textOutput);
             
             // ================= 新增：持久化策略记录 ================= //
             const db = readDb();
@@ -86,8 +112,13 @@ ${rawInput}
 
             return res.json(resultObj);
         } catch (parseErr) {
-            console.error('JSON Parse fail on LLM transform:', textOutput);
-            return res.status(500).json({ error: '大模型返回格式不是标准的JSON，请重试', rawOutput: textOutput });
+            console.error('JSON Parse fail on LLM transform. Raw Output:', textOutput);
+            console.error('Parse Error Detail:', parseErr.message);
+            return res.status(500).json({ 
+                error: '大模型返回格式解析失败，请点击重试', 
+                detail: parseErr.message,
+                rawOutput: textOutput 
+            });
         }
 
     } catch (err) {
