@@ -13,11 +13,12 @@ export default function StrategyWorkshop({ onBack }) {
     const [history, setHistory] = useState([]);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-    // 获取基础策略框架和历史记录
     useEffect(() => {
         fetch(apiUrl(`/api/strategy/framework/${currentPersona.id}`))
             .then(res => res.json())
-            .then(data => setFrameworkData(data))
+            .then(data => {
+                if (data && !data.error) setFrameworkData(data);
+            })
             .catch(err => console.error(err));
 
         fetchHistory();
@@ -27,8 +28,18 @@ export default function StrategyWorkshop({ onBack }) {
         setIsHistoryLoading(true);
         fetch(apiUrl(`/api/strategy/history/${currentPersona.id}`))
             .then(res => res.json())
-            .then(data => setHistory(data))
-            .catch(err => console.error('获取历史记录失败:', err))
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setHistory(data);
+                } else {
+                    console.warn('History is not an array:', data);
+                    setHistory([]);
+                }
+            })
+            .catch(err => {
+                console.error('获取历史记录失败:', err);
+                setHistory([]);
+            })
             .finally(() => setIsHistoryLoading(false));
     };
 
