@@ -3,6 +3,7 @@ import { getStrategyFramework } from '../engines/strategy-engine.js';
 import { PersonaModel } from '../models/persona.js';
 import llmProvider from '../llm/openai-provider.js';
 import { readDb, writeDb } from '../models/db.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
@@ -40,23 +41,21 @@ ${rawInput}
 
 【场景辅助信息】：${scenario || '日常交锋/谈判'}
 
-必须依据上述背景和原话，**仅输出一个**符合以下结构的 JSON 对象。禁止包含任何 Markdown 格式、引导语或解释。
-
-JSON 结构：
+【你的任务】：
+请立刻将这句大白话说教成且只能输出 3 种完全不同风格战术的话术（不要解释框架，直接输出干货），要求严格格式化为 JSON 输出：
 {
-  "custom_framework": "策略思路解析",
-  "key_flaws": ["雷点1", "雷点2"],
-  "A": { "style": "风格名", "script": "话术内容" },
-  "B": { "style": "风格名", "script": "话术内容" },
-  "C": { "style": "风格名", "script": "话术内容" }
+  "custom_framework": "针对此场景的具体策略思路（基于对方的PLS特征分析为什么原话不可行，以及正确的沟通框架逻辑）",
+  "key_flaws": ["这句话的第一个致命伤: 没有数据支撑", "这句话的第二个致命伤: 语气过于挑战权威"],
+  "A": { "style": "激进压制型/结论先行 (主攻高P/高L痛点)", "script": "这里是话术内容..." },
+  "B": { "style": "温和引导型/防守垫层 (安抚其高S防线，建立共商机制)", "script": "..." },
+  "C": { "style": "利益互换型/以进为退 (给出无法轻易拒绝的 ROI 代价)", "script": "..." }
 }
+务必仅返回这一个 JSON 对象，不要加上额外的标记或解释。
 `;
 
         const messages = [{ role: 'user', content: prompt }];
-        // 尝试开启 JSON Mode (DeepSeek/OpenAI 支持)
-        const completion = await llmProvider.generateChatResponse(messages, false, {
-            response_format: { type: "json_object" }
-        });
+        // 不再强制启用 JSON Mode (部分模型供应商 SDK 兼容性可能存在问题)
+        const completion = await llmProvider.generateChatResponse(messages, false);
         let textOutput = completion.choices[0].message.content.trim();
 
         console.log(`[DEBUG] LLM Transform Raw Output Length: ${textOutput.length}`);
@@ -94,13 +93,12 @@ JSON 结构：
         try {
             const resultObj = parseRobustJson(textOutput);
             
-            // ================= 新增：持久化策略记录 ================= //
             const db = readDb();
             // 兼容老版本DB文件缺少 strategy_records 数组的情况
             if (!db.strategy_records) db.strategy_records = [];
             
             const newRecord = {
-                id: require('uuid').v4(),
+                id: uuidv4(),
                 personaId: personaId,
                 userId: deviceId, 
                 scenario: scenario || '日常交锋/谈判',
