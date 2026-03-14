@@ -49,7 +49,8 @@ function initDb() {
         fs.writeFileSync(dbPath, JSON.stringify({
             personas: [],
             sandbox_sessions: [],
-            session_messages: []
+            session_messages: [],
+            strategy_records: []
         }, null, 2));
     }
 }

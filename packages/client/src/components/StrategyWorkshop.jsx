@@ -10,13 +10,27 @@ export default function StrategyWorkshop({ onBack }) {
     const [isTranslating, setIsTranslating] = useState(false);
     const [translationResult, setTranslationResult] = useState(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [history, setHistory] = useState([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
+    // 获取基础策略框架和历史记录
     useEffect(() => {
         fetch(apiUrl(`/api/strategy/framework/${currentPersona.id}`))
             .then(res => res.json())
             .then(data => setFrameworkData(data))
             .catch(err => console.error(err));
+
+        fetchHistory();
     }, [currentPersona.id]);
+
+    const fetchHistory = () => {
+        setIsHistoryLoading(true);
+        fetch(apiUrl(`/api/strategy/history/${currentPersona.id}`))
+            .then(res => res.json())
+            .then(data => setHistory(data))
+            .catch(err => console.error('获取历史记录失败:', err))
+            .finally(() => setIsHistoryLoading(false));
+    };
 
     const handleTransform = async (e) => {
         e.preventDefault();
@@ -39,6 +53,7 @@ export default function StrategyWorkshop({ onBack }) {
             const data = await res.json();
             if (res.ok) {
                 setTranslationResult(data);
+                fetchHistory(); // 重新拉取最新的历史记录
             } else {
                 alert(data.error || '解析失败，请重试');
             }
@@ -50,12 +65,29 @@ export default function StrategyWorkshop({ onBack }) {
         }
     };
 
+    const loadHistoryRecord = (record) => {
+        setScenario(record.scenario);
+        setRawInput(record.rawInput);
+        setTranslationResult(record.result);
+    };
+
+    const deleteHistoryRecord = async (e, recordId) => {
+        e.stopPropagation();
+        if(!confirm('确定要删除该条推演记录吗？')) return;
+        try {
+            const res = await fetch(apiUrl(`/api/strategy/history/${recordId}`), { method: 'DELETE' });
+            if(res.ok) fetchHistory();
+        } catch (error) {
+            console.error('删除失败:', error);
+        }
+    }
+
     return (
         <div style={{
             display: 'flex', flexDirection: 'column',
             ...(isExpanded ?
                 { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, background: 'var(--bg-main)', padding: '20px', maxWidth: 'none', height: '100vh' } :
-                { height: '80vh', maxWidth: '1000px', width: '100%' }),
+                { height: '85vh', maxWidth: '1200px', width: '100%' }),
             gap: '1rem'
         }}>
 
@@ -97,14 +129,59 @@ export default function StrategyWorkshop({ onBack }) {
                 </div>
             </div>
 
-            {/* 下部：操作与输出区 */}
+            {/* 下部：操作与输出区，分为三列（历史、输入、输出） */}
             <div style={{ display: 'flex', gap: '1.5rem', flex: 1, overflow: 'hidden' }}>
 
-                {/* 左侧：我方原本的大白话输入框 */}
-                <div style={{ flex: '0 0 40%', display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', borderRadius: '4px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                {/* 左列：历史记录抽屉 */}
+                <div style={{ flex: '0 0 22%', display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', borderRadius: '4px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                     <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card-hover)' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.1rem' }}>第一步：输入诉求与底层原话</h3>
-                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>输入你真实的沟通目的和你想说的"大白话"，引擎会结合 PLS 模型，生成防暴雷/高转化率的专项策略与定制话术。</p>
+                        <h3 style={{ margin: 0, fontSize: '1rem' }}>📜 历史推演记录</h3>
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
+                        {isHistoryLoading ? (
+                            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem', fontSize: '0.9rem' }}>加载中...</div>
+                        ) : history.length === 0 ? (
+                            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem', fontSize: '0.9rem' }}>暂无策略记录<br/><br/>在右侧生成的策略会被永久保存在此处</div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {history.map(record => (
+                                    <div 
+                                        key={record.id} 
+                                        onClick={() => loadHistoryRecord(record)}
+                                        style={{ 
+                                            padding: '0.8rem', 
+                                            background: 'rgba(255,255,255,0.03)', 
+                                            borderRadius: '4px', 
+                                            cursor: 'pointer',
+                                            border: '1px solid transparent',
+                                            transition: 'all 0.2s',
+                                            position: 'relative'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                                        onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
+                                    >
+                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '4px', color: 'var(--color-p)' }}>{record.scenario}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>"{record.rawInput}"</div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            {new Date(record.created_at).toLocaleString([], {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'})}
+                                            <button 
+                                                onClick={(e) => deleteHistoryRecord(e, record.id)}
+                                                style={{ background: 'transparent', border: 'none', color: '#fb7185', cursor: 'pointer', fontSize: '0.8rem', padding: '2px' }}
+                                                title="删除记录"
+                                            >🗑️</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 中列：我方原本的大白话输入框 */}
+                <div style={{ flex: '0 0 32%', display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', borderRadius: '4px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card-hover)' }}>
+                        <h3 style={{ margin: 0, fontSize: '1rem' }}>第一步：输入诉求与底层原话</h3>
+                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>输入沟通目的和想说的"大白话"，引擎将生成专属沟通策略。</p>
                     </div>
 
                     <form onSubmit={handleTransform} style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '1rem', gap: '1rem' }}>
@@ -114,7 +191,7 @@ export default function StrategyWorkshop({ onBack }) {
                                 type="text"
                                 value={scenario}
                                 onChange={e => setScenario(e.target.value)}
-                                placeholder="例如：周会汇报被怼、申请资源、挽留将离职核心骨干..."
+                                placeholder="例如：周会汇报被怼、申请资源..."
                                 style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'white', outline: 'none', boxSizing: 'border-box' }}
                             />
                         </div>
@@ -124,7 +201,7 @@ export default function StrategyWorkshop({ onBack }) {
                             <textarea
                                 value={rawInput}
                                 onChange={e => setRawInput(e.target.value)}
-                                placeholder="例如：我真的尽力了，这个项目本来就很难，现在时间不够我也没办法，你要么加人要么延期吧。"
+                                placeholder="例如：我真的尽力了，这个项目本来就很难..."
                                 style={{ flex: 1, width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'white', outline: 'none', boxSizing: 'border-box', resize: 'none', lineHeight: '1.5' }}
                             />
                         </div>
@@ -134,18 +211,18 @@ export default function StrategyWorkshop({ onBack }) {
                             disabled={isTranslating || !rawInput.trim()}
                             style={{ width: '100%', padding: '12px', background: 'var(--color-l)', color: 'white', border: 'none', borderRadius: '4px', cursor: (isTranslating || !rawInput.trim()) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
                         >
-                            {isTranslating ? '正在推演多种应对战略 (调用 LLM)...' : '生成 A/B/C 三轨战略话术'}
+                            {isTranslating ? '正在推演多种应对战略...' : '生成 A/B/C 三轨战略话术'}
                         </button>
                     </form>
                 </div>
 
-                {/* 右侧：翻译与纠正输出区 */}
+                {/* 右列：翻译与纠正输出区 */}
                 <div style={{ flex: 1, padding: '1.5rem', background: 'var(--bg-card)', borderRadius: '4px', border: '1px solid var(--border-color)', overflowY: 'auto' }}>
                     {!translationResult && !isTranslating && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>
                             <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }}>🤖</div>
-                            <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>等待引擎接收诉求</h3>
-                            <p style={{ maxWidth: '300px', lineHeight: '1.5' }}>在左侧输入您遇到的沟通场景与打算说的原话。<br /><br />大模型将结合 {currentPersona.name} 的 PLS 性格指纹，即时演算出最适合的沟通策略，并给您 3 套立即可用的高情商话术。</p>
+                            <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>等待接收诉求或点击历史记录</h3>
+                            <p style={{ maxWidth: '300px', lineHeight: '1.5' }}>在左侧输入诉求或点击左边侧栏加载历史存档。<br /><br />我们将结合 {currentPersona.name} 的 PLS 性格指纹，即时演算出最适合的沟通策略与防雷话术。</p>
                         </div>
                     )}
 
@@ -159,7 +236,7 @@ export default function StrategyWorkshop({ onBack }) {
 
                     {translationResult && !isTranslating && (
                         <div style={{ animation: 'fadeIn 0.5s' }}>
-                            <h3 style={{ margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>第二步：定制策略与话术生成输出</h3>
+                            <h3 style={{ margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>第二步：定制策略与话术生存输出</h3>
 
                             {translationResult.custom_framework && (
                                 <div style={{ background: 'var(--bg-card-hover)', borderLeft: '4px solid var(--color-p)', padding: '1rem', borderRadius: '4px', marginBottom: '1.5rem' }}>

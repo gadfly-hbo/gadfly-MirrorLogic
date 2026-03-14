@@ -19,6 +19,7 @@ router.get('/framework/:personaId', (req, res) => {
 router.post('/transform', async (req, res) => {
     try {
         const { personaId, rawInput, scenario } = req.body;
+        const deviceId = req.query.deviceId || 'anonymous'; // 接收前端传来的标识
         const persona = PersonaModel.findById(personaId);
         if (!persona) return res.status(404).json({ error: 'Persona not found' });
 
@@ -63,6 +64,26 @@ ${rawInput}
 
         try {
             const resultObj = JSON.parse(textOutput);
+            
+            // ================= 新增：持久化策略记录 ================= //
+            const db = readDb();
+            // 兼容老版本DB文件缺少 strategy_records 数组的情况
+            if (!db.strategy_records) db.strategy_records = [];
+            
+            const newRecord = {
+                id: require('uuid').v4(),
+                personaId: personaId,
+                userId: deviceId, 
+                scenario: scenario || '日常交锋/谈判',
+                rawInput: rawInput,
+                result: resultObj,
+                created_at: new Date().toISOString()
+            };
+            
+            db.strategy_records.push(newRecord);
+            writeDb(db);
+            // ======================================================= //
+
             return res.json(resultObj);
         } catch (parseErr) {
             console.error('JSON Parse fail on LLM transform:', textOutput);
@@ -71,6 +92,48 @@ ${rawInput}
 
     } catch (err) {
         console.error('[Strategy Transform Error]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 新增 GET 路由：获取策略历史记录
+router.get('/history/:personaId', (req, res) => {
+    try {
+        const deviceId = req.query.deviceId || 'anonymous';
+        const db = readDb();
+        if (!db.strategy_records) {
+            return res.json([]);
+        }
+        
+        const records = db.strategy_records
+            .filter(r => r.personaId === req.params.personaId && r.userId === deviceId)
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // 时间倒序
+            
+        res.json(records);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 新增 DELETE 路由：删除指定策略记录
+router.delete('/history/:recordId', (req, res) => {
+    try {
+        const deviceId = req.query.deviceId || 'anonymous';
+        const db = readDb();
+        if (!db.strategy_records) return res.json({ success: true });
+        
+        const initialLen = db.strategy_records.length;
+        // 只能删除匹配 deviceId 的记录，兼顾安全性
+        db.strategy_records = db.strategy_records.filter(
+            r => !(r.id === req.params.recordId && r.userId === deviceId)
+        );
+        
+        if (db.strategy_records.length !== initialLen) {
+            writeDb(db);
+        }
+        
+        res.json({ success: true });
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
