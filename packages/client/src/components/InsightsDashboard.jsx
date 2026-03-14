@@ -1,20 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../store';
+import { apiUrl } from '../utils/api';
 
 export default function InsightsDashboard({ onBack }) {
     const { currentPersona } = useStore();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetch(`/api/insights/${currentPersona.id}`)
-            .then(res => res.json())
+        fetch(apiUrl(`/api/insights/${currentPersona.id}`))
+            .then(res => {
+                if (!res.ok) throw new Error('网络请求失败: ' + res.status);
+                return res.json();
+            })
             .then(result => {
                 setData(result);
                 setLoading(false);
             })
             .catch(err => {
-                console.error(err);
+                console.error('洞察数据加载失败:', err);
+                setError(err.message);
                 setLoading(false);
             });
     }, [currentPersona.id]);
@@ -23,6 +29,17 @@ export default function InsightsDashboard({ onBack }) {
 
     if (loading) {
         return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '3rem' }}>正在同步 {currentPersona.name} 的沙盘数据矩阵...</div>;
+    }
+
+    if (error || !data) {
+        return (
+            <div className="welcome-card" style={{ maxWidth: '800px', width: '100%', textAlign: 'center', borderColor: 'rgba(244, 63, 94, 0.3)' }}>
+                <h2 style={{ margin: '0 0 1rem 0', color: '#fb7185' }}>数据加载失败</h2>
+                <p style={{ color: 'var(--text-secondary)' }}>您可能尚未完成任何推演，或者网络连接存在异常。</p>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>{error && `错误信息: ${error}`}</div>
+                <button onClick={onBack} style={{ marginTop: '2rem', padding: '10px 20px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>返回镜像库</button>
+            </div>
+        );
     }
 
     if (data && data.totalSessions === 0) {
