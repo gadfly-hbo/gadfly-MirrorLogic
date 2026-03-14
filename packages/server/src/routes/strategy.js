@@ -56,11 +56,10 @@ ${rawInput}
         const completion = await llmProvider.generateChatResponse(messages, false);
         let textOutput = completion.choices[0].message.content.trim();
 
-        // 容错处理：MiniMax 有时还是会包裹 ```json
-        if (textOutput.startsWith('\`\`\`json')) {
-            textOutput = textOutput.replace(/^\`\`\`json\s*/, '').replace(/\s*\`\`\`$/, '');
-        } else if (textOutput.startsWith('\`\`\`')) {
-            textOutput = textOutput.replace(/^\`\`\`\s*/, '').replace(/\s*\`\`\`$/, '');
+        // 增强的 JSON 提取逻辑：匹配最外层的 { ... } 结构
+        const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            textOutput = jsonMatch[0];
         }
 
         try {
