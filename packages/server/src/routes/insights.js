@@ -72,6 +72,24 @@ router.get('/:personaId', (req, res) => {
                 turnCount: s.live_metrics.turnsCount
             }));
 
+        // 获取最近 5 个会话的详细消息
+        const recentSessionsData = sessions
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+            .slice(0, 5)
+            .map(s => {
+                const messages = (db.session_messages || [])
+                    .filter(m => m.session_id === s.id)
+                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+                    .map(m => {
+                        let metrics = null;
+                        if (m.metrics_json) {
+                            try { metrics = JSON.parse(m.metrics_json); } catch (e) {}
+                        }
+                        return { ...m, metrics };
+                    });
+                return { ...s, messages };
+            });
+
         res.json({
             personaId: persona.id,
             personaName: persona.name,
@@ -80,7 +98,8 @@ router.get('/:personaId', (req, res) => {
             averageFriction,
             avgTurns: turnsSum / sessions.length,
             recentTriggers,
-            trendData
+            trendData,
+            recentSessions: recentSessionsData
         });
 
     } catch (err) {

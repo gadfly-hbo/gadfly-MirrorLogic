@@ -52,13 +52,19 @@ export function generateMetricsPrompt(persona, userMessage, aiReply) {
 用户说："${userMessage}"
 对象回复："${aiReply}"
 
-请直接输出一个纯JSON（不要任何其他文字），评估用户话术的效果：
-{"successDelta": 0.05, "emotionFriction": 0.02, "triggers": ["触发的防御机制"]}
+请直接输出一个纯 JSON（不要任何其他文字），评估用户话术的效果：
+{
+  "successDelta": 0.05, 
+  "emotionFriction": 0.02, 
+  "triggers": ["触发的防御机制"],
+  "analysis": "针对该话术的专业诊断分析，说明为什么会触发上述防御机制或产生摩擦"
+}
 
 规则：
-- successDelta: -0.15到0.15的浮点数，正数表示用户话术有效，负数表示适得其反
-- emotionFriction: -0.15到0.15的浮点数，正数表示产生了情绪摩擦
+- successDelta: -0.15 到 0.15 的浮点数，正数表示用户话术有效，负数表示适得其反
+- emotionFriction: -0.15 到 0.15 的浮点数，正数表示产生了情绪摩擦
 - triggers: 字符串数组，用户触发了对象的哪些防御机制（如"权威挑战","逻辑缺失","空头支票"等），没有则为空数组
+- analysis: 字符串，对本次沟通的深度诊断说明，特别是针对负面影响的解释
 
-只输出JSON，不要任何其他内容。`;
+只输出 JSON，不要任何其他内容。`;
 }

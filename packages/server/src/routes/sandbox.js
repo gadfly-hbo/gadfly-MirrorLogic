@@ -165,7 +165,8 @@ router.post('/:id/chat', async (req, res) => {
             turnMetrics = {
                 successDelta: parsed.successDelta || 0,
                 emotionFriction: parsed.emotionFriction || 0,
-                triggers: parsed.triggers || []
+                triggers: parsed.triggers || [],
+                analysis: parsed.analysis || ''
             };
         } catch (metricsErr) {
             console.error('[Metrics Eval Error]', metricsErr.message);
